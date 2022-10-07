@@ -4,58 +4,95 @@ A test script to compare performance of QUIC stacks
 This file is intended to be run with NPF
 
 %variables
-
-FSIZE=5000000
-PORT=4455
-SERVER=picoquic
-CLIENT=picoquic
-RP=10
-CLIENT_IRQ=8
-CLIENT_CPU=8
-CLIENT_THREADS=8
-SRV_IRQ=0
-SRV_CPU=1
-CLIENT_PARALLEL=128
-H=10
-//CLIENT={quiche,ngtcp2}
-//SERVER={quiche,ngtcp2}
-
+default_repo=local
+var_test=1
 %config
-timeout=30
+timeout=60
 
-%init@server sudo=true
-docker stop quic-srv
-docker rm quic-srv
-docker stop quic-client
-docker rm quic-client
-echo "RESULT 0"
-
-// WRK
-%script@client delay=2 sudo=true ifeq-CLIENT=wrk-quic delay=3
-export LD_LIBRARY_PATH=/home/tbarbette/workspace/dpdk-21.08/install/lib/x86_64-linux-gnu/:/usr/lib64/:$LD_LIBRARY_PATH
-fname=log.${NPF_ARRAY_ID}
-cd ~/workspace/wrk-quic/src
-DST=10.100.0.2
-taskset -c 0-$CLIENT_CPU ../wrk -a -R 0 --timeout $H -q -t $CLIENT_THREADS -c $CLIENT_PARALLEL  https://$DST:4433/$FSIZE -L -U 2>&1 | tee $fname
-cat $fname | grep "Transfer/sec" | awk '{printf "RESULT-GOODPUT %s\n", $2}' | head -n 1
-cat $fname | grep "Requests/sec" | awk '{printf "RESULT-REQUEST %s\n", $2}' | head -n 1
-cat $fname | grep "Latency" | awk '{printf "RESULT-LATENCY %s\n", $2}' | head -n 1
-cat $fname| grep "99.000%" | awk '{printf "RESULT-LAT99 %s\n", $2}' | head -n 1
-
+//--------------
+// General command to run the differents scripts
+// command : python3 ../npf/npf-run.py --test quic_tester.npf --cluster client=client server=server --variables CLIENT=YOURCLIENT SERVER=YOURSERVER
+// from    : /home/nikita/workspace/quic_implems_cmp
+//--------------
 
 
 //--------------
-// PICOQUIC w/wo DPDK
+// picoquic-dpdk
 //--------------
 
 %script@server sudo=true ifeq-SERVER=picoquic-dpdk
-cd ${NPF_ROOT}
-export LD_LIBRARY_PATH=/home/tbarbette/workspace/dpdk-21.11.2/install/lib/:/usr/lib64/:/home/tbarbette/workspace/dpdk-21.11.2/install/lib/x86_64-linux-gnu/
-./dpdk_picoquicdemo --dpdk -l 0-1 -a 0000:18:00.0 -- -p 4443
+cd /home/nikita/workspace/dpdk_picoquic
+export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/home/nikita/dpdk_install_21.11/lib/x86_64-linux-gnu
+sudo LD_LIBRARY_PATH=$LD_LIBRARY_PATH ./dpdk_picoquicdemo --dpdk -l 2-3 -a 0000:18:00.0 --  -* 32 -@ 32 -p 4443 -1 | tee outServer
 
+//working
 %script@client sudo=true delay=3 ifeq-CLIENT=picoquic-dpdk
-cd ${NPF_ROOT}
-export LD_LIBRARY_PATH=/home/tbarbette/workspace/dpdk-21.11.2/install/lib/:/usr/lib64/:/home/tbarbette/workspace/dpdk-21.11.2/install/lib/x86_64-linux-gnu/
-./dpdk_picoquicdemo --dpdk -l 0-$CLIENT_CPU -a 0000:18:00.0 -- -N $RP -H $H -X -D -A 50:6b:4b:f3:7c:70 10.100.0.2 4443 /$FSIZE | tee out
-echo "RESULT-REQUESTS "$(cat out | grep Served | cut -f 2 -d' ')
+echo client
+cd /home/nikita/workspace/dpdk_picoquic
+export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/home/nikita/dpdk_install_21.11/lib/x86_64-linux-gnu
+sudo LD_LIBRARY_PATH=$LD_LIBRARY_PATH ./dpdk_picoquicdemo --dpdk -l 2-3 -a 0000:18:00.0 -- -X -D -A 50:6b:4b:f3:7c:70 -* 32 -@ 32 10.100.0.2 4445 /20000000000 | tee out
 echo "RESULT-GOODPUT "$(cat out | grep Transfer | cut -f 4 -d' ')
+
+
+//--------------
+// picoquic
+//--------------
+
+%script@server sudo=true ifeq-SERVER=picoquic-dpdk
+cd /home/nikita/workspace/dpdk_picoquic
+export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/home/nikita/dpdk_install_21.11/lib/x86_64-linux-gnu
+sudo LD_LIBRARY_PATH=$LD_LIBRARY_PATH ./dpdk_picoquicdemo --nodpdk -B 1000000000 -p 4443
+
+
+//working
+%script@client sudo=true delay=3 ifeq-CLIENT=picoquic-dpdk
+echo client
+cd /home/nikita/workspace/dpdk_picoquic
+export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/home/nikita/dpdk_install_21.11/lib/x86_64-linux-gnu
+sudo LD_LIBRARY_PATH=$LD_LIBRARY_PATH ./dpdk_picoquicdemo --nodpdk -B 1000000000 -D -A 50:6b:4b:f3:7c:71 10.100.0.2 4443 /20000000000
+echo "RESULT-GOODPUT "$(cat out | grep Transfer | cut -f 4 -d' ')
+
+
+//--------------
+// msquic
+//--------------
+
+//working
+%script@server sudo=true ifeq-SERVER=msquic
+cd /home/nikita/workspace/msquic
+./artifacts/bin/linux/x64_Release_openssl/secnetperf -cipher:1 -bind:10.100.0.2
+%script@client sudo=true delay=3 ifeq-CLIENT=msquic
+cd /home/nikita/workspace/msquic
+./artifacts/bin/linux/x64_Release_openssl/secnetperf -cipher:1 -TestName:throughput -target:10.100.0.2 -p 4443 -download:20000000000 | tee out
+echo "RESULT-GOODPUT "$(grep -ioE '[0-9]+ kbps' out | awk '{print $1 /1000000}' | bc)
+
+
+//--------------
+// quicly
+//--------------
+
+//working
+%script@server sudo=true ifeq-SERVER=quicly
+cd /home/nikita/workspace/quicly
+./cli -c server.cert -k server.key 10.100.0.2 4433 -b 20000000000 -G
+
+%script@client sudo=true ifeq-SERVER=quicly
+cd /home/nikita/workspace/quicly
+res=$(sudo ./cli -p /20000000000 10.100.0.2 4433 -O -b 20000000000 -G | grep -ioE '[0-9.]+ gbps' | awk '{print $1}')
+echo "RESULT-GOODPUT "$res
+
+
+//--------------
+// quiche
+//--------------
+
+//not working
+%script@server sudo=true ifeq-SERVER=quiche
+cd /home/nikita/workspace/quiche
+./target/release/examples/http3-server -p 4445 -k cert.key -c cert.crt
+
+%script@client sudo=true ifeq-SERVER=quiche
+cd /home/nikita/workspace/quiche
+res=$(sudo ./target/release/examples/http3-client -G 10000000000 -X keys.log 10.100.0.2 4445 | grep -ioE '[0-9.]+ mbps' | awk '{print $1 /1000}' | bc)
+echo "RESULT-GOODPUT "$res
+
