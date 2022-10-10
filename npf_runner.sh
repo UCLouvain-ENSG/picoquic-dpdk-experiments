@@ -1,1 +1,1 @@
-python3 ../npf/npf-run.py --cluster client=client server=server --test $1 --variables SERVER=picoquic-dpdk CLIENT=picoquic-dpdk --show-cmd --show-ful
+python3 ../npf/npf-compare.py local+msquic:msquic local+quicly:quicly local+picoquic:picoquic local+picoquicDpdk:picoquicDpdk local+quiche:quiche local+quant:quant --test quic_tester_compare.npf --cluster client=client server=server

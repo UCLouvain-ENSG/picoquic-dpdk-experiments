@@ -1,0 +1,119 @@
+%info
+A test script to compare performance of QUIC stacks
+
+This file is intended to be run with NPF
+
+%variables
+default_repo=local
+var_test=1
+%config
+timeout=60
+
+//--------------
+// General command to run the differents scripts
+// command : python3 ../npf/npf-compare.py local+msquic:msquic local+quicly:quicly local+picoquic:picoquic local+picoquicDpdk:picoquicDpdk local+quiche:quiche --test quic_tester_compare.npf --cluster client=client server=server
+// from    : /home/nikita/workspace/quic_implems_cmp
+//--------------
+
+
+//--------------
+// picoquic-dpdk
+//--------------
+
+%picoquicDpdk:script@server sudo=true
+cd /home/nikita/workspace/dpdk_picoquic
+export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/home/nikita/dpdk_install_21.11/lib/x86_64-linux-gnu
+sudo LD_LIBRARY_PATH=$LD_LIBRARY_PATH ./dpdk_picoquicdemo --dpdk -l 2-3 -a 0000:18:00.0 -- -p 4443 -1 | tee outServer
+
+//working
+%picoquicDpdk:script@client sudo=true delay=3
+echo client
+cd /home/nikita/workspace/dpdk_picoquic
+export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/home/nikita/dpdk_install_21.11/lib/x86_64-linux-gnu
+sudo LD_LIBRARY_PATH=$LD_LIBRARY_PATH ./dpdk_picoquicdemo --dpdk -l 2-3 -a 0000:18:00.0 -- -X -D -A 50:6b:4b:f3:7c:70 10.100.0.2 4443 /20000000000 | tee out
+echo "RESULT-GOODPUT "$(cat out | grep -ioE '[0-9.]+ mbps' | awk '{print $1 /1000}' |bc)
+
+
+//--------------
+// picoquic
+//--------------
+
+%picoquic:script@server sudo=true
+cd /home/nikita/workspace/dpdk_picoquic
+export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/home/nikita/dpdk_install_21.11/lib/x86_64-linux-gnu
+sudo LD_LIBRARY_PATH=$LD_LIBRARY_PATH ./dpdk_picoquicdemo --nodpdk -B 1000000000 -p 4443
+
+
+//working
+%picoquic:script@client sudo=true delay=3
+echo client
+cd /home/nikita/workspace/dpdk_picoquic
+export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/home/nikita/dpdk_install_21.11/lib/x86_64-linux-gnu
+sudo LD_LIBRARY_PATH=$LD_LIBRARY_PATH ./dpdk_picoquicdemo --nodpdk -B 1000000000 -D -A 50:6b:4b:f3:7c:71 10.100.0.2 4443 /20000000000 | tee out
+echo "RESULT-GOODPUT "$(cat out | grep -ioE '[0-9.]+ mbps' | awk '{print $1 /1000}' | bc)
+
+
+//--------------
+// msquic
+//--------------
+
+//working
+%msquic:script@server sudo=true
+cd /home/nikita/workspace/msquic
+./artifacts/bin/linux/x64_Release_openssl/secnetperf -cipher:1 -bind:10.100.0.2
+%msquic:script@client sudo=true delay=3
+cd /home/nikita/workspace/msquic
+./artifacts/bin/linux/x64_Release_openssl/secnetperf -cipher:1 -TestName:throughput -target:10.100.0.2 -p 4443 -download:20000000000 | tee out
+echo "RESULT-GOODPUT "$(grep -ioE '[0-9]+ kbps' out | awk '{print $1 /1000000}' | bc)
+
+
+//--------------Executing init scripts...
+
+// quicly
+//--------------
+
+//working
+%quicly:script@server sudo=true
+cd /home/nikita/workspace/quicly
+./cli -c server.cert -k server.key 10.100.0.2 4433 -b 20000000000 -G
+
+%quicly:script@client sudo=true delay=3
+cd /home/nikita/workspace/quicly
+res=$(sudo ./cli -p /20000000000 10.100.0.2 4433 -O -b 20000000000 -G | grep -ioE '[0-9.]+ gbps' | awk '{print $1}')
+echo "RESULT-GOODPUT "$res
+
+
+//--------------
+// quiche
+//--------------
+
+//working
+%quiche:script@server sudo=true
+cd /home/nikita/workspace/quiche
+./target/release/examples/http3-server -p 4445 -k cert.key -c cert.crt
+
+%quiche:script@client sudo=true delay=3
+cd /home/nikita/workspace/quiche
+res=$(sudo ./target/release/examples/http3-client -G 10000000000 -X keys.log 10.100.0.2 4445 | grep -ioE '[0-9.]+ mbps' | awk '{print $1 /1000}' | bc)
+echo "RESULT-GOODPUT "$res
+
+
+//--------------
+// quant
+//--------------
+
+//working (non netmap version)
+%quant:script@server
+cd /home/nikita/workspace/quant
+./Release/bin/server -b 10000000 -i ens1f0
+
+
+%quant:script@client delay=3
+cd /home/nikita/workspace/quant
+./Release/bin/client -r 2 -i ens1f0 -b 10000000 -c false -i ens1f0 URL https://10.100.0.2:4433/20000000000 | tee out
+echo "RESULT-GOODPUT "$(cat out | grep https | grep -ioE '[0-9.]+ gb/s' | tail -n 1 | awk '{print $1}')
+
+
+
+
+
