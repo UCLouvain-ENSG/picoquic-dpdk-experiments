@@ -1,0 +1,8 @@
+name=picoquic_dpdk
+branch=oldpquic
+url=git@github.com:ntyunyayev/picoquic.git
+method=git
+bin_folder=
+bin_name=
+configure=git submodule init git submodule update && cmake . 
+make=cmake . && make

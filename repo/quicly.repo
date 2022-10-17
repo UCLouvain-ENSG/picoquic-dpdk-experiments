@@ -1,0 +1,8 @@
+name=quicly
+branch=master
+url=git@github.com:ntyunyayev/quicly.git
+method=git
+bin_folder=
+bin_name=cli_quicly
+configure=git submodule update --init --recursive && cmake .
+make=cmake . && make

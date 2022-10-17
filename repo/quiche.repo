@@ -1,0 +1,8 @@
+name=quiche
+branch=master
+url=git@github.com:ntyunyayev/quiche.git
+method=git
+bin_folder=target/release/examples/
+bin_name=
+configure=git submodule update --init --recursive
+make=cargo build --release --examples

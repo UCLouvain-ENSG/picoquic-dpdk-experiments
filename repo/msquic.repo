@@ -1,0 +1,9 @@
+name=msquic
+branch=main
+url=git@github.com:ntyunyayev/msquic.git
+method=git
+bin_folder=artifacts/bin/linux/x64_Release_openssl/
+bin_name=
+configure=git submodule update --init --recursive && (echo | sudo pwsh ./scripts/prepare-machine.ps1)
+clean=sudo pwsh ./scripts/build.ps1 -Clean
+make=sudo pwsh ./scripts/build.ps1 -Config Release

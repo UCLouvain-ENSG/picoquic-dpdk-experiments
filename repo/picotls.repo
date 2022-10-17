@@ -1,0 +1,8 @@
+name=picotls
+branch=master
+url=git@github.com:ntyunyayev/picotls.git
+method=git
+bin_folder=
+bin_name=cli
+configure=git submodule init && git submodule update && cmake .
+make=cmake . && make
