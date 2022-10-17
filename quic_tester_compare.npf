@@ -26,17 +26,14 @@ timeout=60
 // picoquic-dpdk
 //--------------
 
-%picoquicDpdk:script@server sudo=true
-cd /home/nikita/workspace/dpdk_picoquic
+%picoquic_dpdk:script@server sudo=true
 export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/home/nikita/dpdk_install_21.11/lib/x86_64-linux-gnu
-sudo LD_LIBRARY_PATH=$LD_LIBRARY_PATH ./dpdk_picoquicdemo --dpdk -l 2-3 -a 0000:18:00.0 -- -p 4443 -1 | tee outServer
+sudo env PATH=$PATH LD_LIBRARY_PATH=$LD_LIBRARY_PATH dpdk_picoquicdemo --dpdk -l 2-3 -a 0000:18:00.0 -- -c $cert -k $key -p 4443
 
-//working
-%picoquicDpdk:script@client sudo=true delay=3
-cd /home/nikita/workspace/dpdk_picoquic
+%picoquic_dpdk:script@client sudo=true delay=3
 export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/home/nikita/dpdk_install_21.11/lib/x86_64-linux-gnu
-sudo LD_LIBRARY_PATH=$LD_LIBRARY_PATH ./dpdk_picoquicdemo --dpdk -l 2-3 -a 0000:18:00.0 -- -X -D -A 50:6b:4b:f3:7c:70 10.100.0.2 4443 /20000000000 | tee out
-echo "RESULT-GOODPUT "$(cat out | grep -ioE '[0-9.]+ mbps' | awk '{print $1 /1000}' |bc)
+sudo env PATH=$PATH LD_LIBRARY_PATH=$LD_LIBRARY_PATH dpdk_picoquicdemo --dpdk -l 2-3 -a 0000:18:00.0 -- -X -D -A 50:6b:4b:f3:7c:70 10.100.0.2 4443 /20000000000 | tee ~/out.pquic_dpdk
+echo "RESULT-GOODPUT "$(cat ~/out.pquic_dpdk | grep -ioE '[0-9.]+ mbps' | awk '{print $1 /1000}' |bc)
 
 
 //--------------
@@ -46,7 +43,7 @@ echo "RESULT-GOODPUT "$(cat out | grep -ioE '[0-9.]+ mbps' | awk '{print $1 /100
 %picoquic:script@server sudo=true
 cd /home/nikita/workspace/dpdk_picoquic
 export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/home/nikita/dpdk_install_21.11/lib/x86_64-linux-gnu
-sudo LD_LIBRARY_PATH=$LD_LIBRARY_PATH ./dpdk_picoquicdemo --nodpdk -B 1000000000 -p 4443
+sudo env PATH=$PATH LD_LIBRARY_PATH=$LD_LIBRARY_PATH /dpdk_picoquicdemo --nodpdk -B 1000000000 -p 4443
 
 
 //working
@@ -54,8 +51,8 @@ sudo LD_LIBRARY_PATH=$LD_LIBRARY_PATH ./dpdk_picoquicdemo --nodpdk -B 1000000000
 echo client
 cd /home/nikita/workspace/dpdk_picoquic
 export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/home/nikita/dpdk_install_21.11/lib/x86_64-linux-gnu
-sudo LD_LIBRARY_PATH=$LD_LIBRARY_PATH ./dpdk_picoquicdemo --nodpdk -B 1000000000 -D -A 50:6b:4b:f3:7c:71 10.100.0.2 4443 /20000000000 | tee out
-echo "RESULT-GOODPUT "$(cat out | grep -ioE '[0-9.]+ mbps' | awk '{print $1 /1000}' | bc)
+sudo env PATH=$PATH LD_LIBRARY_PATH=$LD_LIBRARY_PATH dpdk_picoquicdemo --nodpdk -B 1000000000 -D -A 50:6b:4b:f3:7c:71 10.100.0.2 4443 /20000000000 | tee ~/out.pquic
+echo "RESULT-GOODPUT "$(cat ~/out.pquic | grep -ioE '[0-9.]+ mbps' | awk '{print $1 /1000}' | bc)
 
 
 //--------------
