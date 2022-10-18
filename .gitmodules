@@ -1,12 +1,6 @@
-[submodule "picoquic"]
-	path = picoquic
-	url = git@github.com:ntyunyayev/picoquic.git
-[submodule "msquic"]
-	path = msquic
-	url = git@github.com:ntyunyayev/msquic.git
-[submodule "quiche"]
-	path = quiche
-	url = git@github.com:ntyunyayev/quiche.git
 [submodule "picotls"]
 	path = picotls
 	url = git@github.com:h2o/picotls.git
+[submodule "npf"]
+	path = npf
+	url = git@github.com:tbarbette/npf.git
