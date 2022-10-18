@@ -61,11 +61,11 @@ echo "RESULT-GOODPUT "$(cat ~/out.pquic | grep -ioE '[0-9.]+ mbps' | awk '{print
 
 //working
 %msquic:script@server sudo=true
-secnetperf -cipher:1 -bind:10.100.0.2
+sudo env PATH=$PATH secnetperf -cipher:1 -bind:10.100.0.2 -p 4443
 
 %msquic:script@client sudo=true delay=3
-secnetperf -cipher:1 -TestName:throughput -target:10.100.0.2 -p 4443 -download:20000000000 | tee out
-echo "RESULT-GOODPUT "$(grep -ioE '[0-9]+ kbps' out | awk '{print $1 /1000000}' | bc)
+sudo env PATH=$PATH secnetperf -cipher:1 -TestName:throughput -target:10.100.0.2 -p 4443 -download:20000000000 | tee ~/out.msquic
+echo "RESULT-GOODPUT "$(grep -ioE '[0-9]+ kbps' ~/out.msquic | awk '{print $1 /1000000}' | bc)
 
 
 //--------------

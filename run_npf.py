@@ -16,7 +16,9 @@ def npf_runner(stacks,client,server):
         elif stack == 'picoquic' or stack == 'picoquic-dpdk':
             print("hello")
             #building picotls requiered by picoquic and picoquic-dpdk
-            #subprocess.Popen((cmd + '--no-tests'.format('picotls').split(), stdout=subprocess.PIPE)
+            picotls_cmd = "python3 npf/npf-compare.py picotls --test quic_tester_compare.npf --cluster client={} server={} --no-tests --force-build".format(client,server)
+            p = subprocess.Popen((cmd + '--no-tests'.format('picotls').split(), stdout=subprocess.PIPE)
+            p.wait()
         else: 
             used_stacks+='{}+{} '.format(stack,stack)
     with Popen(cmd.format(used_stacks,client,server).split(), stdout=PIPE, bufsize=1, universal_newlines=True) as p:
