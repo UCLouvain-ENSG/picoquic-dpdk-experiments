@@ -10,3 +10,6 @@
 [submodule "picotls"]
 	path = picotls
 	url = git@github.com:h2o/picotls.git
+[submodule "npf"]
+	path = npf
+	url = git@github.com:tbarbette/npf.git
