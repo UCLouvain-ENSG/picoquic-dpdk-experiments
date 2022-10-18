@@ -5,7 +5,8 @@ from subprocess import Popen, PIPE
 
 def npf_runner(stacks,client,server):
     supported_stack = ['picoquic','picoquic-dpdk','msquic','quiche','quicly','picotls']
-    cmd = "python3 npf/npf-compare.py {}--test quic_tester_compare.npf --cluster client={} server={} --force-build"
+    cmd = "python3 npf/npf-compare.py {}--test quic_tester_compare.npf --cluster client={} server={} --force-build --force-retest"
+    cmd2 = "python3 npf/npf-compare.py {}--test quic_tester_compare.npf --cluster client={} server={} --force-retest"
     used_stacks = ''
 
     for stack in stacks:
@@ -17,11 +18,11 @@ def npf_runner(stacks,client,server):
             print("hello")
             #building picotls requiered by picoquic and picoquic-dpdk
             picotls_cmd = "python3 npf/npf-compare.py picotls --test quic_tester_compare.npf --cluster client={} server={} --no-tests --force-build".format(client,server)
-            p = subprocess.Popen((cmd + '--no-tests'.format('picotls').split(), stdout=subprocess.PIPE)
+            p = subprocess.Popen((cmd + '--no-tests').format('picotls').split(), stdout=subprocess.PIPE)
             p.wait()
         else: 
             used_stacks+='{}+{} '.format(stack,stack)
-    with Popen(cmd.format(used_stacks,client,server).split(), stdout=PIPE, bufsize=1, universal_newlines=True) as p:
+    with Popen(cmd2.format(used_stacks,client,server).split(), stdout=PIPE, bufsize=1, universal_newlines=True) as p:
         for line in p.stdout:
             print(line, end='') # process line here
     

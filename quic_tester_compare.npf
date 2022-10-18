@@ -4,7 +4,7 @@ A test script to compare performance of QUIC stacks
 This file is intended to be run with NPF
 
 %variables
-var_test=1
+NB_CORES={taskset -c 2:1core ,taskset -c 4:2cores}
 
 %late_variables
 key=/home/nikita/workspace/key_directory/server.key
@@ -12,6 +12,16 @@ cert=/home/nikita/workspace/key_directory/server.cert
 
 %config
 timeout=60
+
+%init
+//removing irqbalance, core 2 will handles every interrupt
+sudo ethtool -L ens1f0 combined 1 && sudo systemctl stop irqbalance && sudo /usr/sbin/set_irq_affinity_cpulist.sh 2 ens1f0
+
+%pyexit
+import os
+#Enabling IRQ balance avec the test
+os.system('sudo ethtool -L ens1f0 combined 32 && sudo systemctl start irqbalance && sudo /usr/sbin/set_irq_affinity_cpulist.sh 0-31 ens1f0 >> /dev/null')
+
 
 
 //--------------
@@ -43,7 +53,7 @@ echo "RESULT-GOODPUT "$(cat ~/out.pquic_dpdk | grep -ioE '[0-9.]+ mbps' | awk '{
 %picoquic:script@server sudo=true
 cd /home/nikita/workspace/dpdk_picoquic
 export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/home/nikita/dpdk_install_21.11/lib/x86_64-linux-gnu
-sudo env PATH=$PATH LD_LIBRARY_PATH=$LD_LIBRARY_PATH /dpdk_picoquicdemo --nodpdk -B 1000000000 -p 4443
+sudo env PATH=$PATH LD_LIBRARY_PATH=$LD_LIBRARY_PATH $NB_CORES /dpdk_picoquicdemo --nodpdk -B 1000000000 -p 4443
 
 
 //working
@@ -51,7 +61,7 @@ sudo env PATH=$PATH LD_LIBRARY_PATH=$LD_LIBRARY_PATH /dpdk_picoquicdemo --nodpdk
 echo client
 cd /home/nikita/workspace/dpdk_picoquic
 export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/home/nikita/dpdk_install_21.11/lib/x86_64-linux-gnu
-sudo env PATH=$PATH LD_LIBRARY_PATH=$LD_LIBRARY_PATH dpdk_picoquicdemo --nodpdk -B 1000000000 -D -A 50:6b:4b:f3:7c:71 10.100.0.2 4443 /20000000000 | tee ~/out.pquic
+sudo env PATH=$PATH LD_LIBRARY_PATH=$LD_LIBRARY_PATH $NB_CORES dpdk_picoquicdemo --nodpdk -B 1000000000 -D -A 50:6b:4b:f3:7c:71 10.100.0.2 4443 /20000000000 | tee ~/out.pquic
 echo "RESULT-GOODPUT "$(cat ~/out.pquic | grep -ioE '[0-9.]+ mbps' | awk '{print $1 /1000}' | bc)
 
 
@@ -61,10 +71,10 @@ echo "RESULT-GOODPUT "$(cat ~/out.pquic | grep -ioE '[0-9.]+ mbps' | awk '{print
 
 //working
 %msquic:script@server sudo=true
-sudo env PATH=$PATH secnetperf -cipher:1 -bind:10.100.0.2 -p 4443
+sudo env PATH=$PATH $NB_CORES secnetperf -cipher:1 -bind:10.100.0.2 -p 4443
 
 %msquic:script@client sudo=true delay=3
-sudo env PATH=$PATH secnetperf -cipher:1 -TestName:throughput -target:10.100.0.2 -p 4443 -download:20000000000 | tee ~/out.msquic
+sudo env PATH=$PATH $NB_CORES secnetperf -cipher:1 -TestName:throughput -target:10.100.0.2 -p 4443 -download:20000000000 | tee ~/out.msquic
 echo "RESULT-GOODPUT "$(grep -ioE '[0-9]+ kbps' ~/out.msquic | awk '{print $1 /1000000}' | bc)
 
 
@@ -74,10 +84,10 @@ echo "RESULT-GOODPUT "$(grep -ioE '[0-9]+ kbps' ~/out.msquic | awk '{print $1 /1
 
 //working
 %quicly:script@server sudo=true
-cli_quicly -c $cert -k $key 10.100.0.2 4433 -b 20000000000 -G
+sudo env PATH=$PATH $NB_CORES cli_quicly -c $cert -k $key 10.100.0.2 4433 -b 20000000000 -G
 
 %quicly:script@client sudo=true delay=3
-res=$(cli_quicly -p /20000000000 10.100.0.2 4433 -O -b 20000000000 -G | grep -ioE '[0-9.]+ gbps' | awk '{print $1}')
+res=$(sudo env PATH=$PATH $NB_CORES cli_quicly -p /20000000000 10.100.0.2 4433 -O -b 20000000000 -G | grep -ioE '[0-9.]+ gbps' | awk '{print $1}')
 echo "RESULT-GOODPUT "$res
 
 
@@ -87,10 +97,10 @@ echo "RESULT-GOODPUT "$res
 
 //working
 %quiche:script@server sudo=true
-sudo env PATH=$PATH http3-server -p 4445 -k $key -c $cert
+sudo env PATH=$PATH $NB_CORES http3-server -p 4445 -k $key -c $cert
 
 %quiche:script@client sudo=true delay=3
-res=$(sudo env PATH=$PATH http3-client -G 10000000000 -X keys.log 10.100.0.2 4445 | grep -ioE '[0-9.]+ mbps' | awk '{print $1 /1000}' | bc)
+res=$(sudo env PATH=$PATH $NB_CORES http3-client -G 10000000000 -X keys.log 10.100.0.2 4445 | grep -ioE '[0-9.]+ mbps' | awk '{print $1 /1000}' | bc)
 echo "RESULT-GOODPUT "$res
 
 
@@ -115,17 +125,13 @@ echo "RESULT-GOODPUT "$(cat out | grep https | grep -ioE '[0-9.]+ gb/s' | tail -
 
 //working
 %picotls:script@server
-cli -c $cert -k $key 10.100.0.2 8443 -B -y aes128gcmsha256 2>&1 | grep -ioE "[0-9.]+Mbps" | rev | cut -c7- | rev | tee ~/out.picotls
+sudo env PATH=$PATH  $NB_CORES cli -c $cert -k $key 10.100.0.2 8443 -B -y aes128gcmsha256 2>&1 | grep -ioE "[0-9.]+Mbps" | rev | cut -c7- | rev | tee ~/out.picotls
 echo "RESULT-GOODPUT "$(cat ~/out.picotls)
 
 %picotls:script@client delay=3
-cli 10.100.0.2 -B 8443 -y aes128gcmsha256 &
+sudo env PATH=$PATH $NB_CORES cli 10.100.0.2 -B 8443 -y aes128gcmsha256 &
 sleep 20
 sudo kill $(pidof cli)
-
-
-
-
 
 
 
