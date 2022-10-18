@@ -74,10 +74,10 @@ echo "RESULT-GOODPUT "$(grep -ioE '[0-9]+ kbps' out | awk '{print $1 /1000000}' 
 
 //working
 %quicly:script@server sudo=true
-cli_quicly -c $cert -k $key 10.100.0.2 4433 -b 20000000000 -G | tee /home/nikita/workspace/logOutput/quicly_server_out.txt
+cli_quicly -c $cert -k $key 10.100.0.2 4433 -b 20000000000 -G
 
 %quicly:script@client sudo=true delay=3
-res=$(cli_quicly -p /20000000000 10.100.0.2 4433 -O -b 20000000000 -G | tee /home/nikita/workspace/logOutput | grep -ioE '[0-9.]+ gbps' | awk '{print $1}')
+res=$(cli_quicly -p /20000000000 10.100.0.2 4433 -O -b 20000000000 -G | grep -ioE '[0-9.]+ gbps' | awk '{print $1}')
 echo "RESULT-GOODPUT "$res
 
 

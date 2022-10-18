@@ -10,9 +10,19 @@ Example :
 
 ```
 #launches a comparson between picoquic and msquic
-python3 npf_runner.sh picoquic msquic
+python3 npf_runner.sh --stacks picoquic msquic --client client --server server
 ```
 
-In the case of picoquic and picoquic-dpdk, a build of picotls is required, the script will build this repository first.
+In the case of picoquic and picoquic-dpdk, a build of picotls is required, the script will build this repository first. Moreover picoquic_dpdk requieres a build of DPDK.
+
+# CLUSTER
+
+the cluster repository contains configs to connect to node through ssh. By passing --client=client and --server=server to run_npf.py those files will be used. It is also possible to specified a machine to use directly
+
+Example :
+``` 
+--client=user01@server01.network.edu
+```
+
 
 
