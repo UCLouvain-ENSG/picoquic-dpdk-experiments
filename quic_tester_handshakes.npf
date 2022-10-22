@@ -1,0 +1,69 @@
+%info
+A test script to compare performance of QUIC stacks
+
+This file is intended to be run with NPF
+
+%variables
+
+
+FSIZE=5000000
+PORT=4455
+SERVER=picoquic
+CLIENT=picoquic
+RP=10
+CLIENT_IRQ=8
+CLIENT_CPU=8
+CLIENT_THREADS=8
+SRV_IRQ=0
+SRV_CPU=1
+CLIENT_PARALLEL=128
+H=10
+//PARRALEL=[1*64]
+//THREADS=[1*64]
+
+%late_variables
+key=  ${NPF_ROOT}/server.key
+cert= ${NPF_ROOT}/server.cert
+RUNTIME=10000
+
+
+%config
+timeout=60
+
+
+%picoquic_dpdk:script@server sudo=true
+sudo ethtool -L ens1f0 combined 1 && sudo systemctl stop irqbalance && sudo /usr/sbin/set_irq_affinity_cpulist.sh 2 ens1f0
+export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/home/nikita/dpdk_install_21.11/lib/x86_64-linux-gnu
+sudo env PATH=$PATH LD_LIBRARY_PATH=$LD_LIBRARY_PATH taskset -c 2 dpdk_picoquicdemo --dpdk -l 0-1 -a 0000:18:00.0 -- -c $cert -k $key -p 4443 2>&1 | tee ~/logs.handshakes 
+
+%picoquic_dpdk:script@client sudo=true delay=3
+export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/home/nikita/dpdk_install_21.11/lib/x86_64-linux-gnu 
+sudo env PATH=$PATH LD_LIBRARY_PATH=$LD_LIBRARY_PATH taskset -c 8 dpdk_picoquicdemo --nodpdk -N $RP -H $H  -t $CLIENT_THREADS -D 10.100.0.2 4443 /$FSIZE | tee out
+echo "RESULT-REQUESTS "$(cat out | tail -n 3 | grep 'Served' | awk '{print $2 / 10}' | bc)
+
+
+
+%picoquic:script@server sudo=true
+export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/home/nikita/dpdk_install_21.11/lib/x86_64-linux-gnu
+sudo env PATH=$PATH LD_LIBRARY_PATH=$LD_LIBRARY_PATH taskset -c 2 dpdk_picoquicdemo --nodpdk -c $cert -k $key -p 4443
+
+%picoquic:script@client sudo=true delay=5
+export LD_LIBRARY_PATH=/home/tbarbette/workspace/dpdk-21.11.2/install/lib/:/usr/lib64/:/home/tbarbette/workspace/dpdk-21.11.2/install/lib/x86_64-linux-gnu/
+sudo env PATH=$PATH LD_LIBRARY_PATH=$LD_LIBRARY_PATH taskset -c 8 dpdk_picoquicdemo --nodpdk -N $RP -H $H  -t $CLIENT_THREADS -D 10.100.0.2 4443 /$FSIZE | tee out
+echo "RESULT-REQUESTS "$(cat out | tail -n 3 | grep 'Served' | awk '{print $2 / 10}' | bc)
+
+
+
+%msquic:script@server sudo=true
+sudo env PATH=$PATH taskset -c 2 secnetperf -cipher:1 -bind:10.100.0.2
+
+%msquic:script@client sudo=true delay=3
+sudo env PATH=$PATH taskset -c 0-7 secnetperf -cipher:1 -TestName:HPS -target:10.100.0.2 -p 4433 -runtime:$RUNTIME -parralel:$PARALLEL -threads:$THREADS | tee out
+echo "RESULT-HANDSHAKES "$(cat out | grep 'Result' | awk '{print $2}' | bc)
+
+
+
+
+
+
+
