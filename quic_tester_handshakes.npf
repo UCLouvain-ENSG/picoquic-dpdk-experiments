@@ -6,8 +6,7 @@ This file is intended to be run with NPF
 %variables
 
 
-FSIZE=5000000
-PORT=4455
+FSIZE=0
 SERVER=picoquic
 CLIENT=picoquic
 RP=10
@@ -26,20 +25,30 @@ key=  ${NPF_ROOT}/server.key
 cert= ${NPF_ROOT}/server.cert
 RUNTIME=10000
 
+%init@client
+//enabling IRQ balance
+sudo ethtool -L ens1f0 combined 32 && sudo systemctl start irqbalance && sudo /usr/sbin/set_irq_affinity_cpulist.sh 0-31 ens1f0
+
+%init@server
+//removing irqbalance, core 2 will handles every interrupt
+sudo ethtool -L ens1f0 combined 1 && sudo systemctl stop irqbalance && sudo /usr/sbin/set_irq_affinity_cpulist.sh 2 ens1f0
 
 %config
 timeout=60
+n_runs=5
 
 
 %picoquic_dpdk:script@server sudo=true
 sudo ethtool -L ens1f0 combined 1 && sudo systemctl stop irqbalance && sudo /usr/sbin/set_irq_affinity_cpulist.sh 2 ens1f0
 export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/home/nikita/dpdk_install_21.11/lib/x86_64-linux-gnu
-sudo env PATH=$PATH LD_LIBRARY_PATH=$LD_LIBRARY_PATH taskset -c 2 dpdk_picoquicdemo --dpdk -l 0-1 -a 0000:18:00.0 -- -c $cert -k $key -p 4443 2>&1 | tee ~/logs.handshakes 
+sudo env PATH=$PATH LD_LIBRARY_PATH=$LD_LIBRARY_PATH dpdk_picoquicdemo --dpdk -l 0-1 -a 0000:18:00.0 -- -c $cert -k $key -p 4443 2>&1 | tee ~/logs.handshakes 
 
 %picoquic_dpdk:script@client sudo=true delay=3
-export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/home/nikita/dpdk_install_21.11/lib/x86_64-linux-gnu 
-sudo env PATH=$PATH LD_LIBRARY_PATH=$LD_LIBRARY_PATH taskset -c 8 dpdk_picoquicdemo --nodpdk -N $RP -H $H  -t $CLIENT_THREADS -D 10.100.0.2 4443 /$FSIZE | tee out
-echo "RESULT-REQUESTS "$(cat out | tail -n 3 | grep 'Served' | awk '{print $2 / 10}' | bc)
+export LD_LIBRARY_PATH=/home/tbarbette/workspace/dpdk-21.08/install/lib/x86_64-linux-gnu/:/usr/lib64/:$LD_LIBRARY_PATH
+cd /home/tbarbette/workspace/wrk-quic/src
+DST=10.100.0.2
+sudo taskset -c 0-8 ../wrk -a -R 0 --timeout $H -q -t 8 -c 128  https://$DST:4443/$FSIZE -L -U 2>&1 | tee ~/out.txt
+echo "RESULT-HANDSHAKES "$(sudo cat ~/out.txt | tail -n 3 | grep "Requests/sec" | awk '{print $2}')
 
 
 
@@ -48,9 +57,15 @@ export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/home/nikita/dpdk_install_21.11/lib/x86_
 sudo env PATH=$PATH LD_LIBRARY_PATH=$LD_LIBRARY_PATH taskset -c 2 dpdk_picoquicdemo --nodpdk -c $cert -k $key -p 4443
 
 %picoquic:script@client sudo=true delay=5
-export LD_LIBRARY_PATH=/home/tbarbette/workspace/dpdk-21.11.2/install/lib/:/usr/lib64/:/home/tbarbette/workspace/dpdk-21.11.2/install/lib/x86_64-linux-gnu/
-sudo env PATH=$PATH LD_LIBRARY_PATH=$LD_LIBRARY_PATH taskset -c 8 dpdk_picoquicdemo --nodpdk -N $RP -H $H  -t $CLIENT_THREADS -D 10.100.0.2 4443 /$FSIZE | tee out
-echo "RESULT-REQUESTS "$(cat out | tail -n 3 | grep 'Served' | awk '{print $2 / 10}' | bc)
+%picoquic_dpdk:script@client sudo=true delay=3
+export LD_LIBRARY_PATH=/home/tbarbette/workspace/dpdk-21.08/install/lib/x86_64-linux-gnu/:/usr/lib64/:$LD_LIBRARY_PATH
+cd /home/tbarbette/workspace/wrk-quic/src
+DST=10.100.0.2
+sudo taskset -c 0-8 ../wrk -a -R 0 --timeout $H -q -t 8 -c 128  https://$DST:4443/$FSIZE -L -U 2>&1 | tee ~/out.txt
+echo "RESULT-HANDSHAKES "$(sudo cat ~/out.txt | tail -n 3 | grep "Requests/sec" | awk '{print $2}')
+
+
+
 
 
 
@@ -58,10 +73,15 @@ echo "RESULT-REQUESTS "$(cat out | tail -n 3 | grep 'Served' | awk '{print $2 / 
 sudo env PATH=$PATH taskset -c 2 secnetperf -cipher:1 -bind:10.100.0.2
 
 %msquic:script@client sudo=true delay=3
-sudo env PATH=$PATH taskset -c 0-7 secnetperf -cipher:1 -TestName:HPS -target:10.100.0.2 -p 4433 -runtime:$RUNTIME -parralel:$PARALLEL -threads:$THREADS | tee out
-echo "RESULT-HANDSHAKES "$(cat out | grep 'Result' | awk '{print $2}' | bc)
+sudo env PATH=$PATH taskset -c 0-7 secnetperf -cipher:1 -TestName:HPS -target:10.100.0.2 -p 4433 -runtime:$RUNTIME -parralel:16 -threads:8 | tee out
+echo "RESULT-HANDSHAKES "$(cat out | grep 'Result' | awk '{print $2}')
 
+%picotls:script@server sudo=true
+sudo env PATH=$PATH taskset -c 2 cli_tests_server -c $cert -k $key 10.100.0.2 8443 -B -y aes128gcmsha256
 
+%picotls:script@client sudo=true delay=5
+sudo env PATH=$PATH cli_tests --client 10 10 10.100.0.2 -B 8443 -y aes128gcmsha256 | tee out | tee /home/nikita/picotls_logs
+echo "RESULT-HANDSHAKES "$(sudo cat out | grep -ioE '[0-9]+' | awk '{s+=$1} END {print s / 10}')
 
 
 

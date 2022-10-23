@@ -11,9 +11,14 @@ key=  ${NPF_ROOT}/server.key
 cert= ${NPF_ROOT}/server.cert
 
 %config
-timeout=60
+timeout=25
+n_runs=10
 
-%init
+%init@client
+//removing irqbalance, core 2 will handles every interrupt
+sudo ethtool -L ens1f0 combined 1 && sudo systemctl stop irqbalance && sudo /usr/sbin/set_irq_affinity_cpulist.sh 2 ens1f0
+
+%init@server
 //removing irqbalance, core 2 will handles every interrupt
 sudo ethtool -L ens1f0 combined 1 && sudo systemctl stop irqbalance && sudo /usr/sbin/set_irq_affinity_cpulist.sh 2 ens1f0
 
@@ -102,7 +107,7 @@ echo "RESULT-GOODPUT "$res
 sudo env PATH=$PATH $NB_CORES http3-server -p 4445 -k $key -c $cert
 
 %quiche:script@client sudo=true delay=10
-res=$(sudo env PATH=$PATH $NB_CORES http3-client -G 10000000000 -X keys.log 10.100.0.2 4445 | tee -a ~/out_quiche | grep -ioE '[0-9.]+ mbps' | awk '{print $1 /1000}' | bc)
+res=$(sudo env PATH=$PATH $NB_CORES http3-client -G 8000000000 -X keys.log 10.100.0.2 4445 | tee -a ~/out_quiche | grep -ioE '[0-9.]+ mbps' | awk '{print $1 /1000}' | bc)
 echo "RESULT-GOODPUT "$res
 
 
