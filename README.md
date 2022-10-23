@@ -1,5 +1,5 @@
 # README
-This project is an ongoing work to monitor the performance of QUIC implementations. Currently the repository compares the following QUIC implementations : quicly, quiche, msquic, picoquic, picoquic-dpdk. To get a performance reference the repository also contains picotls. This project is an ongoing work to monitor the evolution of QUIC stacks, in the futur other stacks will be added. The
+This project is an ongoing work to monitor the performance of QUIC implementations. Currently the repository compares the following QUIC implementations : quicly, quiche, msquic, picoquic, picoquic-dpdk. To get a performance reference the repository also contains picotls. This project is an ongoing work to monitor the evolution of QUIC stacks, in the futur other stacks will be added.
 
 
 # USAGE
