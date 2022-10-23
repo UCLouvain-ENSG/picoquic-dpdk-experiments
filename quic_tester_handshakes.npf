@@ -57,7 +57,6 @@ export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/home/nikita/dpdk_install_21.11/lib/x86_
 sudo env PATH=$PATH LD_LIBRARY_PATH=$LD_LIBRARY_PATH taskset -c 2 dpdk_picoquicdemo --nodpdk -c $cert -k $key -p 4443
 
 %picoquic:script@client sudo=true delay=5
-%picoquic_dpdk:script@client sudo=true delay=3
 export LD_LIBRARY_PATH=/home/tbarbette/workspace/dpdk-21.08/install/lib/x86_64-linux-gnu/:/usr/lib64/:$LD_LIBRARY_PATH
 cd /home/tbarbette/workspace/wrk-quic/src
 DST=10.100.0.2
